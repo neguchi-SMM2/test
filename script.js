@@ -5,12 +5,12 @@ let audioContext, analyser, microphone, dataArray;
 let animationId;
 let maxVolumeThisTurn = 0;
 let silenceTimer;
-let startedSpeaking = false;
 let hasPassedVolumeThreshold = false;
 
 function startLocalMode() {
   document.getElementById("modeSelection").classList.add("hidden");
   document.getElementById("setup").classList.remove("hidden");
+  updatePlayerList();
 }
 
 function addPlayer() {
@@ -23,9 +23,21 @@ function addPlayer() {
   }
 }
 
+function removePlayer(index) {
+  players.splice(index, 1);
+  updatePlayerList();
+}
+
+function clearPlayers() {
+  players = [];
+  updatePlayerList();
+}
+
 function updatePlayerList() {
   const list = document.getElementById("playerList");
-  list.innerHTML = players.map(name => `<div>${name}</div>`).join("");
+  list.innerHTML = players.map((name, i) =>
+    `<div class="player-entry"><span>${name}</span><button onclick="removePlayer(${i})">削除</button></div>`
+  ).join("");
 }
 
 function startGame() {
@@ -40,38 +52,6 @@ function startGame() {
   document.body.style.backgroundColor = "white";
   document.getElementById("startTurnButton").classList.remove("hidden");
   document.getElementById("nextPlayerButton").classList.add("hidden");
-
-  // マイク起動を開始
-  startAudioProcessing();
-}
-
-function startAudioProcessing() {
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then((stream) => {
-      // stream が MediaStream 型か確認
-      if (stream instanceof MediaStream) {
-        // AudioContextの作成
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-
-        // マイクの音声ストリームを取得
-        microphone = audioContext.createMediaStreamSource(stream);
-        analyser.fftSize = 256;
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        // マイクの音声データをanalyserに接続
-        microphone.connect(analyser);
-
-        // 音量を更新するためのupdate関数を呼び出し
-        update();
-      } else {
-        console.error("取得したストリームが MediaStream ではありません。");
-      }
-    })
-    .catch((err) => {
-      console.error("マイクのアクセスが許可されていないか、エラーが発生しました:", err);
-      alert("マイクのアクセスを許可してください。ページを再読み込みしてください。");
-    });
 }
 
 function prepareTurn() {
@@ -79,60 +59,12 @@ function prepareTurn() {
   document.getElementById("nextPlayerButton").classList.add("hidden");
   maxVolumeThisTurn = 0;
   hasPassedVolumeThreshold = false;
-  startedSpeaking = false;
+  silenceTimer = null;
   document.getElementById("maxVolumeDisplay").textContent = "";
   document.getElementById("maxVolumeThisTurnText").textContent = "0";
   document.body.style.backgroundColor = "white";
-  startMic();
-}
-
-function update() {
-  analyser.getByteTimeDomainData(dataArray);
-  drawWaveform(dataArray);
-
-  let sum = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    const v = (dataArray[i] - 128) / 128;
-    sum += v * v;
-  }
-  const volume = Math.sqrt(sum / dataArray.length);
-  const volumeRounded = Math.round(volume * 100);
-
-  if (volumeRounded > maxVolumeThisTurn) {
-    maxVolumeThisTurn = volumeRounded;
-    document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
-  }
-
   document.getElementById("currentPlayerName").textContent = `${players[currentIndex]} の番！`;
-  document.getElementById("currentVolume").textContent = volumeRounded;
-  document.getElementById("previousVolume").textContent = previousMaxVolume;
-  document.getElementById("volumeBar").style.width = `${volumeRounded}%`;
-
-  if (volumeRounded > previousMaxVolume) {
-    document.body.style.backgroundColor = "#d4f5d4";
-  } else if (volumeRounded < previousMaxVolume && previousMaxVolume > 0) {
-    document.body.style.backgroundColor = "#f5d4d4";
-  } else {
-    document.body.style.backgroundColor = "white";
-  }
-
-  if (volumeRounded > 10) {
-    hasPassedVolumeThreshold = true;
-    startedSpeaking = true;
-    if (silenceTimer) clearTimeout(silenceTimer);
-  }
-
-  if (hasPassedVolumeThreshold && volumeRounded <= 1) {
-    if (!silenceTimer) {
-      silenceTimer = setTimeout(() => {
-        document.getElementById("nextPlayerButton").classList.remove("hidden");
-        document.getElementById("maxVolumeDisplay").textContent = `このターンの最大音量: ${maxVolumeThisTurn}`;
-        cancelAnimationFrame(animationId);
-      }, 500);
-    }
-  }
-
-  animationId = requestAnimationFrame(update);
+  startMic();
 }
 
 function drawWaveform(dataArray) {
@@ -165,12 +97,78 @@ function drawWaveform(dataArray) {
   ctx.stroke();
 }
 
+function startMic() {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      microphone = audioContext.createMediaStreamSource(stream);
+      analyser.fftSize = 256;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      microphone.connect(analyser);
+      update();
+    })
+    .catch(err => {
+      console.error("マイクのアクセスが許可されていないか、エラーが発生しました:", err);
+      alert("マイクのアクセスを許可してください。ページを再読み込みしてください。");
+    });
+}
+
+function update() {
+  analyser.getByteTimeDomainData(dataArray);
+  drawWaveform(dataArray);
+
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = (dataArray[i] - 128) / 128;
+    sum += v * v;
+  }
+  const volume = Math.sqrt(sum / dataArray.length);
+  const volumeRounded = Math.round(volume * 100);
+
+  if (volumeRounded > maxVolumeThisTurn) {
+    maxVolumeThisTurn = volumeRounded;
+    document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
+  }
+
+  document.getElementById("currentVolume").textContent = volumeRounded;
+  document.getElementById("previousVolume").textContent = previousMaxVolume;
+  document.getElementById("volumeBar").style.width = `${volumeRounded}%`;
+
+  if (volumeRounded > previousMaxVolume) {
+    document.body.style.backgroundColor = "#d4f5d4";
+  } else if (volumeRounded < previousMaxVolume && previousMaxVolume > 0) {
+    document.body.style.backgroundColor = "#f5d4d4";
+  } else {
+    document.body.style.backgroundColor = "white";
+  }
+
+  if (volumeRounded > 4) {
+    hasPassedVolumeThreshold = true;
+    if (silenceTimer) clearTimeout(silenceTimer);
+  }
+
+  if (hasPassedVolumeThreshold && volumeRounded <= 1) {
+    if (!silenceTimer) {
+      silenceTimer = setTimeout(() => {
+        document.getElementById("nextPlayerButton").classList.remove("hidden");
+        document.getElementById("maxVolumeDisplay").textContent = `このターンの最大音量: ${maxVolumeThisTurn}`;
+        cancelAnimationFrame(animationId);
+      }, 500);
+    }
+  } else {
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = null;
+  }
+
+  animationId = requestAnimationFrame(update);
+}
+
 function nextTurn() {
-  if (maxVolumeThisTurn < previousMaxVolume) {
+  if (maxVolumeThisTurn < previousMaxVolume && previousMaxVolume > 0) {
     endGame();
     return;
   }
-
   previousMaxVolume = maxVolumeThisTurn;
   currentIndex = (currentIndex + 1) % players.length;
   document.getElementById("nextPlayerButton").classList.add("hidden");
@@ -182,14 +180,11 @@ function endGame() {
   cancelAnimationFrame(animationId);
   document.getElementById("game").classList.add("hidden");
   document.getElementById("result").classList.remove("hidden");
-
-  const winnerIndex = (currentIndex - 1 + players.length) % players.length;
-  const winner = players[winnerIndex];
-  document.getElementById("resultText").textContent = `${winner} の勝ち！`;
+  const loser = players[currentIndex];
+  document.getElementById("resultText").textContent = `${loser} の負け！`;
 }
 
 function resetGame() {
-  players = [];
   currentIndex = 0;
   previousMaxVolume = 0;
   document.getElementById("setup").classList.remove("hidden");
