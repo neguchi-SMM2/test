@@ -1,0 +1,64 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  text-align: center;
+  padding: 20px;
+  transition: background-color 0.3s;
+  background-color: #f4f4f4;
+  color: #333;
+}
+
+.hidden {
+  display: none;
+}
+
+input, button {
+  padding: 10px;
+  margin: 5px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  outline: none;
+}
+
+input {
+  width: 200px;
+  border: 1px solid #ccc;
+}
+
+button {
+  background-color: #ffcc00;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #ffdd33;
+}
+
+#volumeBar {
+  height: 20px;
+  background-color: green;
+  margin-top: 10px;
+  width: 0%;
+  transition: width 0.1s ease-in-out;
+}
+
+canvas {
+  border: 1px solid #ccc;
+  margin: 10px 0;
+  width: 100%;
+  max-width: 400px;
+}
+
+.large-volume {
+  font-size: 24px;
+  font-weight: bold;
+  color: orange;
+  margin-top: 10px;
+}
+
+@media screen and (max-width: 600px) {
+  input, button {
+    width: 90%;
+    font-size: 18px;
+  }
+}
