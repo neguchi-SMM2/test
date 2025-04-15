@@ -47,23 +47,28 @@ function startGame() {
 
 function startAudioProcessing() {
   navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(stream => {
-      // AudioContextの作成
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioContext.createAnalyser();
+    .then((stream) => {
+      // stream が MediaStream 型か確認
+      if (stream instanceof MediaStream) {
+        // AudioContextの作成
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
 
-      // マイクの音声ストリームを取得
-      microphone = audioContext.createMediaStreamSource(stream);
-      analyser.fftSize = 256;
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
+        // マイクの音声ストリームを取得
+        microphone = audioContext.createMediaStreamSource(stream);
+        analyser.fftSize = 256;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-      // マイクの音声データをanalyserに接続
-      microphone.connect(analyser);
+        // マイクの音声データをanalyserに接続
+        microphone.connect(analyser);
 
-      // 音量を更新するためのupdate関数を呼び出し
-      update();
+        // 音量を更新するためのupdate関数を呼び出し
+        update();
+      } else {
+        console.error("取得したストリームが MediaStream ではありません。");
+      }
     })
-    .catch(err => {
+    .catch((err) => {
       console.error("マイクのアクセスが許可されていないか、エラーが発生しました:", err);
       alert("マイクのアクセスを許可してください。ページを再読み込みしてください。");
     });
