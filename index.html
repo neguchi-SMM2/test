@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>モッツァレラチーズゲーム</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="mozzarella.png" />
+</head>
+<body>
+  <div id="modeSelection">
+    <h2>モード選択</h2>
+    <button onclick="startLocalMode()">ローカル対戦</button>
+    <button onclick="startOnlineMode()">オンライン対戦</button>
+  </div>
+
+  <div id="setup" class="hidden">
+    <h2>プレイヤー設定</h2>
+    <input id="playerName" type="text" placeholder="プレイヤー名" />
+    <button onclick="addPlayer()">追加</button>
+    <button onclick="clearPlayers()">全消去</button>
+    <div id="playerList"></div>
+    <button onclick="startGame()">ゲーム開始</button>
+  </div>
+
+  <div id="onlineSetup" class="hidden">
+    <h2>オンライン対戦</h2>
+    <input id="roomId" type="text" placeholder="ルームID" />
+    <button onclick="joinRoom()">ルーム参加</button>
+    <p id="onlineStatus"></p>
+  </div>
+
+  <div id="game" class="hidden">
+    <h2 id="currentPlayerName"></h2>
+    <p>現在の音量: <span id="currentVolume">0</span></p>
+    <p>前の最大音量: <span id="previousVolume">0</span></p>
+    <p>このターンの最大音量: <span id="maxVolumeThisTurnText">0</span></p>
+    <div id="volumeBar"></div>
+    <canvas id="waveform" width="400" height="100"></canvas>
+    <button id="startTurnButton" onclick="prepareTurn()">モッツァレラチーズ！</button>
+    <button id="nextPlayerButton" class="hidden" onclick="nextTurn()">次の人へ</button>
+    <p id="maxVolumeDisplay" class="large-volume"></p>
+  </div>
+
+  <div id="result" class="hidden">
+    <h2 id="resultText"></h2>
+    <button onclick="resetGame()">もう一度</button>
+  </div>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
