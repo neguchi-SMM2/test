@@ -74,6 +74,18 @@ function startAudioProcessing() {
     });
 }
 
+function prepareTurn() {
+  document.getElementById("startTurnButton").classList.add("hidden");
+  document.getElementById("nextPlayerButton").classList.add("hidden");
+  maxVolumeThisTurn = 0;
+  hasPassedVolumeThreshold = false;
+  startedSpeaking = false;
+  document.getElementById("maxVolumeDisplay").textContent = "";
+  document.getElementById("maxVolumeThisTurnText").textContent = "0";
+  document.body.style.backgroundColor = "white";
+  startMic();
+}
+
 function update() {
   analyser.getByteTimeDomainData(dataArray);
   drawWaveform(dataArray);
