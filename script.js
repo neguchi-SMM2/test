@@ -1,113 +1,31 @@
 let players = [];
-let currentPlayerIndex = 0;
-let maxVolume = 0;
-let localStream, audioContext, analyser, dataArray, mediaRecorder;
-let isRecording = false;
-let volumeTimeout;
-let isOnline = false;
-let socket, peer, roomId;
-let remoteStream;
-
-const currentVolumeSpan = document.getElementById("currentVolume");
-const previousVolumeSpan = document.getElementById("previousVolume");
-const maxVolumeThisTurnText = document.getElementById("maxVolumeThisTurnText");
-const currentPlayerName = document.getElementById("currentPlayerName");
-const volumeBar = document.getElementById("volumeBar");
-const waveformCanvas = document.getElementById("waveform");
-const waveformCtx = waveformCanvas.getContext("2d");
+let currentIndex = 0;
+let previousMaxVolume = 0;
+let audioContext, analyser, microphone, dataArray;
+let animationId;
+let maxVolumeThisTurn = 0;
+let silenceTimer;
+let startedSpeaking = false;
+let hasPassedVolumeThreshold = false;
 
 function startLocalMode() {
   document.getElementById("modeSelection").classList.add("hidden");
   document.getElementById("setup").classList.remove("hidden");
 }
 
-function startOnlineMode() {
-  isOnline = true;
-  document.getElementById("modeSelection").classList.add("hidden");
-  document.getElementById("onlineSetup").classList.remove("hidden");
-  initSocket();
-}
-
-function initSocket() {
-  socket = io();
-
-  socket.on("ready", () => {
-    document.getElementById("onlineStatus").textContent = "相手を待っています...";
-  });
-
-  socket.on("offer", async (offer) => {
-    createPeer(false);
-    await peer.signal(offer);
-  });
-
-  socket.on("answer", async (answer) => {
-    await peer.signal(answer);
-  });
-
-  socket.on("candidate", (candidate) => {
-    if (peer) peer.signal(candidate);
-  });
-}
-
-function joinRoom() {
-  roomId = document.getElementById("roomId").value;
-  socket.emit("join", roomId);
-  createPeer(true);
-  document.getElementById("onlineSetup").classList.add("hidden");
-  document.getElementById("setup").classList.remove("hidden");
-}
-
-function createPeer(isInitiator) {
-  navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
-    localStream = stream;
-    peer = new SimplePeer({
-      initiator: isInitiator,
-      trickle: false,
-      stream: localStream
-    });
-
-    peer.on("signal", data => {
-      socket.emit("signal", { roomId, data });
-    });
-
-    peer.on("stream", stream => {
-      remoteStream = stream;
-      const audio = new Audio();
-      audio.srcObject = stream;
-      audio.play();
-    });
-  });
-}
-
 function addPlayer() {
-  const name = document.getElementById("playerName").value.trim();
+  const nameInput = document.getElementById("playerName");
+  const name = nameInput.value.trim();
   if (name) {
     players.push(name);
     updatePlayerList();
-    document.getElementById("playerName").value = "";
+    nameInput.value = "";
   }
 }
 
 function updatePlayerList() {
-  const playerList = document.getElementById("playerList");
-  playerList.innerHTML = "";
-  players.forEach((name, index) => {
-    const div = document.createElement("div");
-    div.textContent = name;
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "削除";
-    delBtn.onclick = () => {
-      players.splice(index, 1);
-      updatePlayerList();
-    };
-    div.appendChild(delBtn);
-    playerList.appendChild(div);
-  });
-}
-
-function clearPlayers() {
-  players = [];
-  updatePlayerList();
+  const list = document.getElementById("playerList");
+  list.innerHTML = players.map(name => `<div>${name}</div>`).join("");
 }
 
 function startGame() {
@@ -115,118 +33,150 @@ function startGame() {
     alert("プレイヤーは2人以上必要です！");
     return;
   }
+  currentIndex = 0;
+  previousMaxVolume = 0;
   document.getElementById("setup").classList.add("hidden");
   document.getElementById("game").classList.remove("hidden");
+  document.body.style.backgroundColor = "white";
+  document.getElementById("startTurnButton").classList.remove("hidden");
+  document.getElementById("nextPlayerButton").classList.add("hidden");
+
+  // マイク起動を開始
   startAudioProcessing();
-  showCurrentPlayer();
 }
-
-function showCurrentPlayer() {
-  currentPlayerName.textContent = `${players[currentPlayerIndex]} の番です`;
-  previousVolumeSpan.textContent = maxVolume;
-  maxVolumeThisTurnText.textContent = "0";
-}
-
-function prepareTurn() {
-  document.getElementById("startTurnButton").classList.add("hidden");
-  maxVolume = 0;
-  maxVolumeThisTurnText.textContent = "0";
-  isRecording = true;
-}
-
-function nextTurn() {
-  currentPlayerIndex++;
-  if (currentPlayerIndex >= players.length) {
-    endGame();
-    return;
-  }
-  showCurrentPlayer();
-  document.getElementById("startTurnButton").classList.remove("hidden");
-  document.getElementById("nextPlayerButton").classList.add("hidden");
-  document.getElementById("maxVolumeDisplay").textContent = "";
-}
-
-function endGame() {
-  document.getElementById("game").classList.add("hidden");
-  document.getElementById("result").classList.remove("hidden");
-
-  const min = Math.min(...volumeHistory);
-  const loserIndex = volumeHistory.indexOf(min);
-  const loser = players[loserIndex];
-
-  document.getElementById("resultText").textContent = `${loser} が負けです！`;
-}
-
-function resetGame() {
-  currentPlayerIndex = 0;
-  volumeHistory = [];
-  maxVolume = 0;
-  isRecording = false;
-  document.getElementById("result").classList.add("hidden");
-  document.getElementById("game").classList.remove("hidden");
-  showCurrentPlayer();
-  document.getElementById("startTurnButton").classList.remove("hidden");
-  document.getElementById("nextPlayerButton").classList.add("hidden");
-  document.getElementById("maxVolumeDisplay").textContent = "";
-}
-
-let volumeHistory = [];
 
 function startAudioProcessing() {
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const source = audioContext.createMediaStreamSource(localStream);
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 512;
-  const bufferLength = analyser.frequencyBinCount;
-  dataArray = new Uint8Array(bufferLength);
-  source.connect(analyser);
-  draw();
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      // AudioContextの作成
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+
+      // マイクの音声ストリームを取得
+      microphone = audioContext.createMediaStreamSource(stream);
+      analyser.fftSize = 256;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      // マイクの音声データをanalyserに接続
+      microphone.connect(analyser);
+
+      // 音量を更新するためのupdate関数を呼び出し
+      update();
+    })
+    .catch(err => {
+      console.error("マイクのアクセスが許可されていないか、エラーが発生しました:", err);
+      alert("マイクのアクセスを許可してください。ページを再読み込みしてください。");
+    });
 }
 
-function draw() {
-  requestAnimationFrame(draw);
+function update() {
   analyser.getByteTimeDomainData(dataArray);
+  drawWaveform(dataArray);
 
-  waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
-  waveformCtx.beginPath();
-  const sliceWidth = waveformCanvas.width / dataArray.length;
-  let x = 0;
+  let sum = 0;
   for (let i = 0; i < dataArray.length; i++) {
-    const v = dataArray[i] / 128.0;
-    const y = (v * waveformCanvas.height) / 2;
-    if (i === 0) {
-      waveformCtx.moveTo(x, y);
-    } else {
-      waveformCtx.lineTo(x, y);
-    }
-    x += sliceWidth;
+    const v = (dataArray[i] - 128) / 128;
+    sum += v * v;
   }
-  waveformCtx.strokeStyle = "black";
-  waveformCtx.stroke();
+  const volume = Math.sqrt(sum / dataArray.length);
+  const volumeRounded = Math.round(volume * 100);
 
-  const rms = Math.sqrt(dataArray.reduce((sum, val) => sum + Math.pow(val - 128, 2), 0) / dataArray.length);
-  const volume = Math.round((rms / 128) * 100);
-  currentVolumeSpan.textContent = volume;
-  volumeBar.style.width = `${volume}%`;
+  if (volumeRounded > maxVolumeThisTurn) {
+    maxVolumeThisTurn = volumeRounded;
+    document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
+  }
 
-  if (isRecording) {
-    if (volume > maxVolume) {
-      maxVolume = volume;
-      maxVolumeThisTurnText.textContent = volume;
-    }
+  document.getElementById("currentPlayerName").textContent = `${players[currentIndex]} の番！`;
+  document.getElementById("currentVolume").textContent = volumeRounded;
+  document.getElementById("previousVolume").textContent = previousMaxVolume;
+  document.getElementById("volumeBar").style.width = `${volumeRounded}%`;
 
-    if (volume >= 4) {
-      clearTimeout(volumeTimeout);
-      volumeTimeout = setTimeout(() => {
-        isRecording = false;
-        volumeHistory.push(maxVolume);
+  if (volumeRounded > previousMaxVolume) {
+    document.body.style.backgroundColor = "#d4f5d4";
+  } else if (volumeRounded < previousMaxVolume && previousMaxVolume > 0) {
+    document.body.style.backgroundColor = "#f5d4d4";
+  } else {
+    document.body.style.backgroundColor = "white";
+  }
+
+  if (volumeRounded > 10) {
+    hasPassedVolumeThreshold = true;
+    startedSpeaking = true;
+    if (silenceTimer) clearTimeout(silenceTimer);
+  }
+
+  if (hasPassedVolumeThreshold && volumeRounded <= 1) {
+    if (!silenceTimer) {
+      silenceTimer = setTimeout(() => {
         document.getElementById("nextPlayerButton").classList.remove("hidden");
-        document.getElementById("maxVolumeDisplay").textContent = `最大音量: ${maxVolume}`;
+        document.getElementById("maxVolumeDisplay").textContent = `このターンの最大音量: ${maxVolumeThisTurn}`;
+        cancelAnimationFrame(animationId);
       }, 500);
     }
   }
 
-  if (isOnline && peer && peer.connected) {
-    peer.send(JSON.stringify({ volume }));
+  animationId = requestAnimationFrame(update);
+}
+
+function drawWaveform(dataArray) {
+  const canvas = document.getElementById("waveform");
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "lime";
+  ctx.beginPath();
+
+  const sliceWidth = canvas.width * 1.0 / dataArray.length;
+  let x = 0;
+
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = dataArray[i] / 128.0;
+    const y = v * canvas.height / 2;
+
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+
+    x += sliceWidth;
   }
+
+  ctx.lineTo(canvas.width, canvas.height / 2);
+  ctx.stroke();
+}
+
+function nextTurn() {
+  if (maxVolumeThisTurn < previousMaxVolume) {
+    endGame();
+    return;
+  }
+
+  previousMaxVolume = maxVolumeThisTurn;
+  currentIndex = (currentIndex + 1) % players.length;
+  document.getElementById("nextPlayerButton").classList.add("hidden");
+  document.getElementById("startTurnButton").classList.remove("hidden");
+  document.getElementById("maxVolumeDisplay").textContent = "";
+}
+
+function endGame() {
+  cancelAnimationFrame(animationId);
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("result").classList.remove("hidden");
+
+  const winnerIndex = (currentIndex - 1 + players.length) % players.length;
+  const winner = players[winnerIndex];
+  document.getElementById("resultText").textContent = `${winner} の勝ち！`;
+}
+
+function resetGame() {
+  players = [];
+  currentIndex = 0;
+  previousMaxVolume = 0;
+  document.getElementById("setup").classList.remove("hidden");
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("result").classList.add("hidden");
+  updatePlayerList();
 }
