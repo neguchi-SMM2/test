@@ -6,10 +6,9 @@ let animationId;
 let maxVolumeThisTurn = 0;
 let silenceTimer;
 let hasPassedVolumeThreshold = false;
-let isOnline = false;
 let volumeSamples = [];
 
-// オンライン用
+let isOnline = false;
 let socket, peer, roomId, username;
 let localStream;
 let isHost = false;
@@ -18,7 +17,7 @@ function startLocalMode() {
   isOnline = false;
   document.getElementById("modeSelection").classList.add("hidden");
   document.getElementById("setup").classList.remove("hidden");
-  document.getElementById("startGameButton").classList.remove("hidden"); // 修正点
+  document.getElementById("startGameButton").classList.remove("hidden");
   updatePlayerList();
 }
 
@@ -40,7 +39,7 @@ function connectToRoom() {
 
   socket.addEventListener("open", () => {
     socket.send(JSON.stringify({ type: "join", roomId, username }));
-    document.getElementById("onlineStatus").textContent = "接続成功";
+    document.getElementById("onlineStatus").textContent = "接続中...";
   });
 
   socket.addEventListener("message", async (event) => {
@@ -57,6 +56,10 @@ function connectToRoom() {
     if (data.type === "playerList") {
       players = data.players;
       updatePlayerList();
+      updateOnlinePlayerDisplay(); // オンライン設定画面用
+      if (isHost) {
+        document.getElementById("startGameButton").classList.remove("hidden");
+      }
     }
 
     if (data.type === "startGame") {
@@ -96,12 +99,10 @@ function setupPeer(initiator) {
   });
 }
 
-function sendChat() {
-  const input = document.getElementById("chatInput");
-  const message = input.value.trim();
-  if (!message) return;
-  socket.send(JSON.stringify({ type: "chat", message, username }));
-  input.value = "";
+function updateOnlinePlayerDisplay() {
+  const el = document.getElementById("onlinePlayers");
+  el.innerHTML = "<h4>ルーム参加者:</h4>" +
+    players.map(name => `<div>${name}</div>`).join("");
 }
 
 function addPlayer() {
@@ -127,7 +128,7 @@ function clearPlayers() {
 function updatePlayerList() {
   const list = document.getElementById("playerList");
   list.innerHTML = players.map((name, i) =>
-    `<div class="player-entry"><span>${name}</span><button onclick="removePlayer(${i})">削除</button></div>`
+    `<div class="player-entry"><span>${name}</span>${!isOnline ? `<button onclick="removePlayer(${i})">削除</button>` : ""}</div>`
   ).join("");
 }
 
@@ -141,12 +142,12 @@ function startGame() {
   document.getElementById("setup").classList.add("hidden");
   document.getElementById("game").classList.remove("hidden");
   document.getElementById("chat").classList.toggle("hidden", !isOnline);
-  document.body.style.backgroundColor = "white";
+  document.body.style.backgroundColor = "#fff8e1";
   document.getElementById("startTurnButton").classList.remove("hidden");
   document.getElementById("nextPlayerButton").classList.add("hidden");
 
   if (isOnline && isHost) {
-    socket.send(JSON.stringify({ type: "startGame", roomId }));
+    socket.send(JSON.stringify({ type: "startGame" }));
   }
 }
 
@@ -154,34 +155,14 @@ function prepareTurn() {
   document.getElementById("startTurnButton").classList.add("hidden");
   document.getElementById("nextPlayerButton").classList.add("hidden");
   maxVolumeThisTurn = 0;
-  volumeSamples = []; 
+  volumeSamples = [];
   hasPassedVolumeThreshold = false;
   silenceTimer = null;
   document.getElementById("maxVolumeDisplay").textContent = "";
   document.getElementById("maxVolumeThisTurnText").textContent = "0";
-  document.body.style.backgroundColor = "#fff8e1"; 
+  document.body.style.backgroundColor = "#fff8e1";
   document.getElementById("currentPlayerName").textContent = `${players[currentIndex]} の番！`;
   startMic();
-}
-
-function drawWaveform(dataArray) {
-  const canvas = document.getElementById("waveform");
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "lime";
-  ctx.beginPath();
-  const sliceWidth = canvas.width * 1.0 / dataArray.length;
-  let x = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    const v = dataArray[i] / 128.0;
-    const y = v * canvas.height / 2;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    x += sliceWidth;
-  }
-  ctx.lineTo(canvas.width, canvas.height / 2);
-  ctx.stroke();
 }
 
 function startMic() {
@@ -214,13 +195,12 @@ function update() {
   const volumeRounded = Math.round(volume * 100);
 
   if (volumeRounded >= 4) {
-    volumeSamples.push(volumeRounded); // 音量4以上を記録
+    volumeSamples.push(volumeRounded);
   }
 
-  const averageVolume =
-    volumeSamples.length > 0
-      ? Math.round(volumeSamples.reduce((a, b) => a + b, 0) / volumeSamples.length)
-      : 0;
+  const averageVolume = volumeSamples.length > 0
+    ? Math.round(volumeSamples.reduce((a, b) => a + b, 0) / volumeSamples.length)
+    : 0;
 
   maxVolumeThisTurn = averageVolume;
   document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
@@ -228,7 +208,6 @@ function update() {
   document.getElementById("previousVolume").textContent = previousMaxVolume;
   document.getElementById("volumeBar").style.width = `${volumeRounded}%`;
 
-  // 背景色の判断（比較は平均音量 vs 前の最大音量）
   if (maxVolumeThisTurn > previousMaxVolume) {
     document.body.style.backgroundColor = "#d4f5d4"; // 緑
   } else if (maxVolumeThisTurn < previousMaxVolume && previousMaxVolume > 0) {
@@ -265,6 +244,29 @@ function update() {
 
   animationId = requestAnimationFrame(update);
 }
+
+function drawWaveform(dataArray) {
+  const canvas = document.getElementById("waveform");
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "lime";
+  ctx.beginPath();
+  const sliceWidth = canvas.width / dataArray.length;
+  let x = 0;
+
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = dataArray[i] / 128.0;
+    const y = v * canvas.height / 2;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    x += sliceWidth;
+  }
+
+  ctx.lineTo(canvas.width, canvas.height / 2);
+  ctx.stroke();
+}
+
 function nextTurn() {
   if (maxVolumeThisTurn < previousMaxVolume && previousMaxVolume > 0) {
     endGame();
@@ -292,4 +294,12 @@ function resetGame() {
   document.getElementById("game").classList.add("hidden");
   document.getElementById("result").classList.add("hidden");
   updatePlayerList();
+}
+
+function sendChat() {
+  const input = document.getElementById("chatInput");
+  const message = input.value.trim();
+  if (!message) return;
+  socket.send(JSON.stringify({ type: "chat", message, username }));
+  input.value = "";
 }
