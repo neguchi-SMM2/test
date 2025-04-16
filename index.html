@@ -6,6 +6,7 @@
   <title>モッツァレラチーズゲーム</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/png" href="mozzarella.png" />
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
 </head>
 <body>
   <div id="modeSelection">
@@ -20,13 +21,14 @@
     <button onclick="addPlayer()">追加</button>
     <button onclick="clearPlayers()">全消去</button>
     <div id="playerList"></div>
-    <button onclick="startGame()">ゲーム開始</button>
+    <button id="startGameButton" onclick="startGame()" class="hidden">ゲーム開始</button>
   </div>
 
   <div id="onlineSetup" class="hidden">
-    <h2>オンライン対戦</h2>
-    <input id="roomId" type="text" placeholder="ルームID" />
-    <button onclick="joinRoom()">ルーム参加</button>
+    <h2>オンライン対戦設定</h2>
+    <input id="roomInput" type="text" placeholder="ルーム名を入力" />
+    <input id="usernameInput" type="text" placeholder="ユーザー名を入力" />
+    <button onclick="connectToRoom()">ルームに接続</button>
     <p id="onlineStatus"></p>
   </div>
 
@@ -42,13 +44,20 @@
     <p id="maxVolumeDisplay" class="large-volume"></p>
   </div>
 
+  <div id="chat" class="hidden">
+    <h3>チャット</h3>
+    <div id="chatMessages" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
+    <input id="chatInput" type="text" placeholder="メッセージを入力" />
+    <button onclick="sendChat()">送信</button>
+  </div>
+
   <div id="result" class="hidden">
     <h2 id="resultText"></h2>
     <button onclick="resetGame()">もう一度</button>
   </div>
 
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <audio id="remoteAudio" autoplay></audio>
+
   <script src="script.js"></script>
 </body>
 </html>
