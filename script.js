@@ -1,4 +1,3 @@
-// script.js（続き）オンライン対戦のプレイヤー・ホスト管理・チャット機能追加
 let players = [];
 let currentIndex = 0;
 let previousMaxVolume = 0;
