@@ -9,6 +9,7 @@
 </head>
 <body>
   <div class="container">
+
     <!-- モード選択 -->
     <div id="modeSelection" class="card">
       <h2>モード選択</h2>
@@ -23,6 +24,7 @@
       <input id="usernameInput" type="text" placeholder="ユーザー名を入力">
       <button onclick="connectToRoom()">ルームに接続</button>
       <p id="onlineStatus"></p>
+      <div id="onlinePlayers" style="margin-top: 10px;"></div> <!-- 追加 -->
     </div>
 
     <!-- プレイヤー設定 -->
@@ -50,7 +52,7 @@
       <p id="maxVolumeDisplay" class="large-volume"></p>
     </div>
 
-    <!-- チャット機能（オンライン時のみ表示） -->
+    <!-- チャット -->
     <div id="chat" class="card hidden">
       <h3>チャット</h3>
       <div id="chatMessages" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
@@ -65,10 +67,7 @@
     </div>
   </div>
 
-  <!-- オンライン音声再生 -->
   <audio id="remoteAudio" autoplay></audio>
-
-  <!-- スクリプト読み込み -->
   <script src="script.js"></script>
 </body>
 </html>
