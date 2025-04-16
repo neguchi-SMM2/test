@@ -26,6 +26,12 @@
       <button id="startGameButton" class="hidden" onclick="startGame()">ゲーム開始</button>
       <p id="onlineStatus"></p>
       <div id="onlinePlayers" style="margin-top: 10px;"></div> <!-- 追加 -->
+      <div id="preGameChat">
+        <h3>チャット</h3>
+        <div id="chatMessages" style="height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
+        <input id="chatInput" type="text" placeholder="メッセージを入力">
+        <button onclick="sendChat()">送信</button>
+      </div>
     </div>
 
     <!-- プレイヤー設定 -->
