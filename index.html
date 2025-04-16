@@ -1,63 +1,74 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1.0">
   <title>モッツァレラチーズゲーム</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="mozzarella.png" />
+  <link rel="icon" type="image/png" href="mozzarella.png">
+  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
 </head>
 <body>
-  <div id="modeSelection">
-    <h2>モード選択</h2>
-    <button onclick="startLocalMode()">ローカル対戦</button>
-    <button onclick="startOnlineMode()">オンライン対戦</button>
+  <div class="container">
+    <!-- モード選択 -->
+    <div id="modeSelection" class="card">
+      <h2>モード選択</h2>
+      <button onclick="startLocalMode()">ローカル対戦</button>
+      <button onclick="startOnlineMode()">オンライン対戦</button>
+    </div>
+
+    <!-- オンライン設定 -->
+    <div id="onlineSetup" class="card hidden">
+      <h2>オンライン対戦設定</h2>
+      <input id="roomInput" type="text" placeholder="ルーム名を入力">
+      <input id="usernameInput" type="text" placeholder="ユーザー名を入力">
+      <button onclick="connectToRoom()">ルームに接続</button>
+      <p id="onlineStatus"></p>
+    </div>
+
+    <!-- プレイヤー設定 -->
+    <div id="setup" class="card hidden">
+      <h2>プレイヤー設定</h2>
+      <input id="playerName" type="text" placeholder="プレイヤー名">
+      <div class="btn-group">
+        <button onclick="addPlayer()">追加</button>
+        <button onclick="clearPlayers()">全て削除</button>
+      </div>
+      <div id="playerList" class="player-list"></div>
+      <button id="startGameButton" class="hidden" onclick="startGame()">ゲーム開始</button>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="game" class="card hidden">
+      <h2 id="currentPlayerName"></h2>
+      <p>現在の音量: <span id="currentVolume">0</span></p>
+      <p>前の最大音量: <span id="previousVolume">0</span></p>
+      <p>このターンの最大音量: <span id="maxVolumeThisTurnText">0</span></p>
+      <div id="volumeBar" class="volume-bar"></div>
+      <canvas id="waveform" width="400" height="100"></canvas>
+      <button id="startTurnButton" onclick="prepareTurn()">モッツァレラチーズ！</button>
+      <button id="nextPlayerButton" class="hidden" onclick="nextTurn()">次の人へ</button>
+      <p id="maxVolumeDisplay" class="large-volume"></p>
+    </div>
+
+    <!-- チャット機能（オンライン時のみ表示） -->
+    <div id="chat" class="card hidden">
+      <h3>チャット</h3>
+      <div id="chatMessages" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
+      <input id="chatInput" type="text" placeholder="メッセージを入力">
+      <button onclick="sendChat()">送信</button>
+    </div>
+
+    <!-- 結果画面 -->
+    <div id="result" class="card hidden">
+      <h2 id="resultText"></h2>
+      <button onclick="resetGame()">もう一度</button>
+    </div>
   </div>
 
-  <div id="setup" class="hidden">
-    <h2>プレイヤー設定</h2>
-    <input id="playerName" type="text" placeholder="プレイヤー名" />
-    <button onclick="addPlayer()">追加</button>
-    <button onclick="clearPlayers()">全消去</button>
-    <div id="playerList"></div>
-    <button id="startGameButton" onclick="startGame()" class="hidden">ゲーム開始</button>
-  </div>
-
-  <div id="onlineSetup" class="hidden">
-    <h2>オンライン対戦設定</h2>
-    <input id="roomInput" type="text" placeholder="ルーム名を入力" />
-    <input id="usernameInput" type="text" placeholder="ユーザー名を入力" />
-    <button onclick="connectToRoom()">ルームに接続</button>
-    <p id="onlineStatus"></p>
-  </div>
-
-  <div id="game" class="hidden">
-    <h2 id="currentPlayerName"></h2>
-    <p>現在の音量: <span id="currentVolume">0</span></p>
-    <p>前の最大音量: <span id="previousVolume">0</span></p>
-    <p>このターンの最大音量: <span id="maxVolumeThisTurnText">0</span></p>
-    <div id="volumeBar"></div>
-    <canvas id="waveform" width="400" height="100"></canvas>
-    <button id="startTurnButton" onclick="prepareTurn()">モッツァレラチーズ！</button>
-    <button id="nextPlayerButton" class="hidden" onclick="nextTurn()">次の人へ</button>
-    <p id="maxVolumeDisplay" class="large-volume"></p>
-  </div>
-
-  <div id="chat" class="hidden">
-    <h3>チャット</h3>
-    <div id="chatMessages" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
-    <input id="chatInput" type="text" placeholder="メッセージを入力" />
-    <button onclick="sendChat()">送信</button>
-  </div>
-
-  <div id="result" class="hidden">
-    <h2 id="resultText"></h2>
-    <button onclick="resetGame()">もう一度</button>
-  </div>
-
+  <!-- オンライン音声再生 -->
   <audio id="remoteAudio" autoplay></audio>
 
+  <!-- スクリプト読み込み -->
   <script src="script.js"></script>
 </body>
 </html>
