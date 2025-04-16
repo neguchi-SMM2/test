@@ -1,4 +1,3 @@
-// --- 共通ロジック ---
 let players = [];
 let currentIndex = 0;
 let previousMaxVolume = 0;
@@ -9,18 +8,99 @@ let silenceTimer;
 let hasPassedVolumeThreshold = false;
 let isOnline = false;
 
-// --- オンライン用 ---
+// オンライン用
 let socket, peer, roomId, username;
 let localStream;
 let isHost = false;
-
-// ========== ローカルプレイ ==========
 
 function startLocalMode() {
   isOnline = false;
   document.getElementById("modeSelection").classList.add("hidden");
   document.getElementById("setup").classList.remove("hidden");
+  document.getElementById("startGameButton").classList.remove("hidden"); // 修正点
   updatePlayerList();
+}
+
+function startOnlineMode() {
+  isOnline = true;
+  document.getElementById("modeSelection").classList.add("hidden");
+  document.getElementById("onlineSetup").classList.remove("hidden");
+}
+
+function connectToRoom() {
+  roomId = document.getElementById("roomInput").value.trim();
+  username = document.getElementById("usernameInput").value.trim();
+  if (!roomId || !username) {
+    alert("ルーム名とユーザー名を入力してください");
+    return;
+  }
+
+  socket = new WebSocket("wss://mozzarella-server.onrender.com");
+
+  socket.addEventListener("open", () => {
+    socket.send(JSON.stringify({ type: "join", roomId, username }));
+    document.getElementById("onlineStatus").textContent = "接続成功";
+  });
+
+  socket.addEventListener("message", async (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === "initPeer") {
+      isHost = data.initiator;
+      if (isHost) {
+        document.getElementById("startGameButton").classList.remove("hidden");
+      }
+      await setupPeer(data.initiator);
+    }
+
+    if (data.type === "playerList") {
+      players = data.players;
+      updatePlayerList();
+    }
+
+    if (data.type === "startGame") {
+      document.getElementById("onlineSetup").classList.add("hidden");
+      document.getElementById("setup").classList.remove("hidden");
+    }
+
+    if (data.type === "turnData") {
+      currentIndex = data.currentIndex;
+      previousMaxVolume = data.previousMaxVolume;
+    }
+
+    if (data.type === "signal") {
+      peer.signal(data.signal);
+    }
+
+    if (data.type === "chat") {
+      const chatBox = document.getElementById("chatMessages");
+      chatBox.innerHTML += `<div><strong>${data.username}:</strong> ${data.message}</div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  });
+}
+
+function setupPeer(initiator) {
+  return navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    localStream = stream;
+    peer = new SimplePeer({ initiator, trickle: false, stream });
+
+    peer.on("signal", data => {
+      socket.send(JSON.stringify({ type: "signal", roomId, signal: data }));
+    });
+
+    peer.on("stream", stream => {
+      document.getElementById("remoteAudio").srcObject = stream;
+    });
+  });
+}
+
+function sendChat() {
+  const input = document.getElementById("chatInput");
+  const message = input.value.trim();
+  if (!message) return;
+  socket.send(JSON.stringify({ type: "chat", message, username }));
+  input.value = "";
 }
 
 function addPlayer() {
@@ -63,6 +143,10 @@ function startGame() {
   document.body.style.backgroundColor = "white";
   document.getElementById("startTurnButton").classList.remove("hidden");
   document.getElementById("nextPlayerButton").classList.add("hidden");
+
+  if (isOnline && isHost) {
+    socket.send(JSON.stringify({ type: "startGame", roomId }));
+  }
 }
 
 function prepareTurn() {
@@ -156,7 +240,7 @@ function update() {
         document.getElementById("maxVolumeDisplay").textContent = `このターンの最大音量: ${maxVolumeThisTurn}`;
         cancelAnimationFrame(animationId);
 
-        if (isOnline) {
+        if (isOnline && isHost) {
           socket.send(JSON.stringify({
             type: "turnData",
             currentIndex,
@@ -200,88 +284,4 @@ function resetGame() {
   document.getElementById("game").classList.add("hidden");
   document.getElementById("result").classList.add("hidden");
   updatePlayerList();
-}
-
-// ========== オンライン対戦 ==========
-
-function startOnlineMode() {
-  isOnline = true;
-  document.getElementById("modeSelection").classList.add("hidden");
-  document.getElementById("onlineSetup").classList.remove("hidden");
-}
-
-function connectToRoom() {
-  roomId = document.getElementById("roomInput").value.trim();
-  username = document.getElementById("usernameInput").value.trim();
-  if (!roomId || !username) {
-    alert("ルーム名とユーザー名を入力してください");
-    return;
-  }
-
-  socket = new WebSocket("wss://mozzarella-server.onrender.com");
-
-  socket.addEventListener("open", () => {
-    socket.send(JSON.stringify({ type: "join", roomId, username }));
-    document.getElementById("onlineStatus").textContent = "サーバーに接続中...";
-  });
-
-  socket.addEventListener("message", async (event) => {
-    const data = JSON.parse(event.data);
-
-    if (data.type === "initPeer") {
-      isHost = data.initiator;
-      if (isHost) {
-        document.getElementById("startGameButton").classList.remove("hidden");
-      }
-      await setupPeer(data.initiator);
-    }
-
-    if (data.type === "playerList") {
-      players = data.players;
-      updatePlayerList();
-    }
-
-    if (data.type === "startGame") {
-      document.getElementById("onlineSetup").classList.add("hidden");
-      document.getElementById("setup").classList.remove("hidden");
-    }
-
-    if (data.type === "turnData") {
-      currentIndex = data.currentIndex;
-      previousMaxVolume = data.previousMaxVolume;
-    }
-
-    if (data.type === "signal") {
-      peer.signal(data.signal);
-    }
-
-    if (data.type === "chat") {
-      const chatBox = document.getElementById("chatMessages");
-      chatBox.innerHTML += `<div><strong>${data.username}:</strong> ${data.message}</div>`;
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-  });
-}
-
-function setupPeer(initiator) {
-  return navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    localStream = stream;
-    peer = new SimplePeer({ initiator, trickle: false, stream });
-
-    peer.on("signal", data => {
-      socket.send(JSON.stringify({ type: "signal", roomId, signal: data }));
-    });
-
-    peer.on("stream", stream => {
-      document.getElementById("remoteAudio").srcObject = stream;
-    });
-  });
-}
-
-function sendChat() {
-  const input = document.getElementById("chatInput");
-  const message = input.value.trim();
-  if (!message) return;
-  socket.send(JSON.stringify({ type: "chat", message, username }));
-  input.value = "";
 }
