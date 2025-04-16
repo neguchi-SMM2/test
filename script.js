@@ -16,6 +16,16 @@ function startOnlineMode() {
   document.getElementById("onlineSetup").classList.remove("hidden");
 }
 
+function startLocalMode() {
+  document.getElementById("modeSelection").classList.add("hidden");
+  document.getElementById("setup").classList.remove("hidden");
+}
+
+function updatePlayerList() {
+  const list = document.getElementById("playerList");
+  list.innerHTML = players.map(name => `<div>${name}</div>`).join("");
+}
+
 function connectToRoom() {
   roomId = document.getElementById("roomInput").value.trim();
   username = document.getElementById("usernameInput").value.trim();
