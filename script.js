@@ -7,6 +7,7 @@ let maxVolumeThisTurn = 0;
 let silenceTimer;
 let hasPassedVolumeThreshold = false;
 let isOnline = false;
+let volumeSamples = [];
 
 // オンライン用
 let socket, peer, roomId, username;
@@ -153,11 +154,12 @@ function prepareTurn() {
   document.getElementById("startTurnButton").classList.add("hidden");
   document.getElementById("nextPlayerButton").classList.add("hidden");
   maxVolumeThisTurn = 0;
+  volumeSamples = []; 
   hasPassedVolumeThreshold = false;
   silenceTimer = null;
   document.getElementById("maxVolumeDisplay").textContent = "";
   document.getElementById("maxVolumeThisTurnText").textContent = "0";
-  document.body.style.backgroundColor = "white";
+  document.body.style.backgroundColor = "#fff8e1"; 
   document.getElementById("currentPlayerName").textContent = `${players[currentIndex]} の番！`;
   startMic();
 }
@@ -211,21 +213,28 @@ function update() {
   const volume = Math.sqrt(sum / dataArray.length);
   const volumeRounded = Math.round(volume * 100);
 
-  if (volumeRounded > maxVolumeThisTurn) {
-    maxVolumeThisTurn = volumeRounded;
-    document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
+  if (volumeRounded >= 4) {
+    volumeSamples.push(volumeRounded); // 音量4以上を記録
   }
 
+  const averageVolume =
+    volumeSamples.length > 0
+      ? Math.round(volumeSamples.reduce((a, b) => a + b, 0) / volumeSamples.length)
+      : 0;
+
+  maxVolumeThisTurn = averageVolume;
+  document.getElementById("maxVolumeThisTurnText").textContent = maxVolumeThisTurn;
   document.getElementById("currentVolume").textContent = volumeRounded;
   document.getElementById("previousVolume").textContent = previousMaxVolume;
   document.getElementById("volumeBar").style.width = `${volumeRounded}%`;
 
-  if (volumeRounded > previousMaxVolume) {
-    document.body.style.backgroundColor = "#d4f5d4";
-  } else if (volumeRounded < previousMaxVolume && previousMaxVolume > 0) {
-    document.body.style.backgroundColor = "#f5d4d4";
+  // 背景色の判断（比較は平均音量 vs 前の最大音量）
+  if (maxVolumeThisTurn > previousMaxVolume) {
+    document.body.style.backgroundColor = "#d4f5d4"; // 緑
+  } else if (maxVolumeThisTurn < previousMaxVolume && previousMaxVolume > 0) {
+    document.body.style.backgroundColor = "#f5d4d4"; // 赤
   } else {
-    document.body.style.backgroundColor = "white";
+    document.body.style.backgroundColor = "#fff8e1"; // 肌色
   }
 
   if (volumeRounded > 4) {
@@ -237,7 +246,7 @@ function update() {
     if (!silenceTimer) {
       silenceTimer = setTimeout(() => {
         document.getElementById("nextPlayerButton").classList.remove("hidden");
-        document.getElementById("maxVolumeDisplay").textContent = `このターンの最大音量: ${maxVolumeThisTurn}`;
+        document.getElementById("maxVolumeDisplay").textContent = `このターンの平均音量: ${maxVolumeThisTurn}`;
         cancelAnimationFrame(animationId);
 
         if (isOnline && isHost) {
@@ -256,7 +265,6 @@ function update() {
 
   animationId = requestAnimationFrame(update);
 }
-
 function nextTurn() {
   if (maxVolumeThisTurn < previousMaxVolume && previousMaxVolume > 0) {
     endGame();
